@@ -95,7 +95,7 @@ func init() {
 // NewDiskstatsCollector returns a new Collector exposing disk device stats.
 // Docs from https://www.kernel.org/doc/Documentation/iostats.txt
 func NewDiskstatsCollector(logger log.Logger) (Collector, error) {
-	var diskLabelNames = []string{"device"}
+	var diskLabelNames = []string{"device", "virt"}
 	fs, err := blockdevice.NewFS(*procPath, *sysPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open sysfs: %w", err)
@@ -320,7 +320,7 @@ func (c *diskstatsCollector) Update(ch chan<- prometheus.Metric) error {
 			if i >= statCount {
 				break
 			}
-			ch <- c.descs[i].mustNewConstMetric(val, dev)
+			ch <- c.descs[i].mustNewConstMetric(val, dev, *instanceUUID)
 		}
 
 		if fsType := info[udevIDFSType]; fsType != "" {

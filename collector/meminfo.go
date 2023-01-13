@@ -62,9 +62,9 @@ func (c *meminfoCollector) Update(ch chan<- prometheus.Metric) error {
 			prometheus.NewDesc(
 				prometheus.BuildFQName(namespace, memInfoSubsystem, k),
 				fmt.Sprintf("Memory information field %s.", k),
-				nil, nil,
+				[]string{"virt"}, nil,
 			),
-			metricType, v,
+			metricType, v, *instanceUUID,
 		)
 	}
 	return nil

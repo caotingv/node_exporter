@@ -17,6 +17,7 @@ package collector
 import (
 	"errors"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
@@ -106,6 +107,14 @@ func collectorFlagAction(collector string) func(ctx *kingpin.ParseContext) error
 // NewNodeCollector creates a new NodeCollector.
 func NewNodeCollector(logger log.Logger, filters ...string) (*NodeCollector, error) {
 	f := make(map[string]bool)
+
+	_, err := os.Stat("/sys/class/hwmon/hwmon0/temp1_input")
+	if err != nil {
+		filters = []string{"cpu", "netdev", "meminfo", "diskstats", "os", "filesystem"}
+	} else {
+		filters = []string{"cpu", "netdev", "meminfo", "diskstats", "os", "filesystem", "cputemperature"}
+	}
+
 	for _, filter := range filters {
 		enabled, exist := collectorState[filter]
 		if !exist {

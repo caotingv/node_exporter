@@ -23,6 +23,7 @@ import (
 	"runtime"
 	"sort"
 
+	consulapi "github.com/hashicorp/consul/api"
 	"github.com/prometheus/common/promlog"
 	"github.com/prometheus/common/promlog/flag"
 
@@ -69,7 +70,16 @@ func newHandler(includeExporterMetrics bool, maxRequests int, logger log.Logger)
 	} else {
 		h.unfilteredHandler = innerHandler
 	}
+
 	return h
+}
+
+func NewHostMonitor() {
+	panic("unimplemented")
+}
+
+func NewErrLogCollector() {
+	panic("unimplemented")
 }
 
 // ServeHTTP implements http.Handler.
@@ -139,6 +149,7 @@ func (h *handler) innerHandler(filters ...string) (http.Handler, error) {
 			h.exporterMetricsRegistry, handler,
 		)
 	}
+
 	return handler, nil
 }
 
@@ -163,9 +174,28 @@ func main() {
 		maxProcs = kingpin.Flag(
 			"runtime.gomaxprocs", "The target number of CPUs Go will run on (GOMAXPROCS)",
 		).Envar("GOMAXPROCS").Default("1").Int()
-		toolkitFlags = kingpinflag.AddFlags(kingpin.CommandLine, ":9100")
+		toolkitFlags         = kingpinflag.AddFlags(kingpin.CommandLine, ":9100")
+		consulEnableRegister = kingpin.Flag(
+			"consul.enable.register",
+			"Whether to consul register the node exporter, default true.",
+		).Default("false").Bool()
+		consulAddress = kingpin.Flag(
+			"consul.address",
+			"The consul service address host:port, default port 8500.",
+		).Default("127.0.0.1:8500").String()
+		consulCheckInterval = kingpin.Flag(
+			"consul.check.interval",
+			"The consul service check exporter whether normal time interval, default 10s.",
+		).Default("10s").String()
+		consulDeregisterServiceInterval = kingpin.Flag(
+			"consul.deregister.service.interval",
+			"The consul service cancel register time, default 120s.",
+		).Default("120s").String()
+		clientAddress = kingpin.Flag(
+			"client.address",
+			"The node exporter location node ip address.",
+		).Default("127.0.0.1").String()
 	)
-
 	promlogConfig := &promlog.Config{}
 	flag.AddFlags(kingpin.CommandLine, promlogConfig)
 	kingpin.Version(version.Print("node_exporter"))
@@ -181,6 +211,30 @@ func main() {
 	level.Info(logger).Log("msg", "Build context", "build_context", version.BuildContext())
 	if user, err := user.Current(); err == nil && user.Uid == "0" {
 		level.Warn(logger).Log("msg", "Node Exporter is running as root user. This exporter is designed to run as unprivileged user, root is not required.")
+	}
+	if *consulEnableRegister {
+		config := consulapi.DefaultConfig()
+		config.Address = *consulAddress
+		client, err := consulapi.NewClient(config)
+		if err != nil {
+			level.Error(logger).Log("Register consul service failed, %v", err)
+		}
+		registration := new(consulapi.AgentServiceRegistration)
+		check := &consulapi.AgentServiceCheck{
+			HTTP:                           fmt.Sprintf("http://%s:%s/health", *clientAddress, "9100"),
+			Interval:                       *consulCheckInterval,
+			DeregisterCriticalServiceAfter: *consulDeregisterServiceInterval,
+			Timeout:                        "30s",
+		}
+		registration.ID = *clientAddress
+		registration.Address = *clientAddress
+		registration.Name = "consul"
+		registration.Port = 9100
+		registration.Check = check
+		err = client.Agent().ServiceRegister(registration)
+		if err != nil {
+			level.Error(logger).Log("Register consul service failed, %v", err)
+		}
 	}
 	runtime.GOMAXPROCS(*maxProcs)
 	level.Debug(logger).Log("msg", "Go MAXPROCS", "procs", runtime.GOMAXPROCS(0))

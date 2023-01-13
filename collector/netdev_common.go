@@ -101,7 +101,7 @@ func (c *netDevCollector) metricDesc(key string) *prometheus.Desc {
 		c.metricDescs[key] = prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, c.subsystem, key+"_total"),
 			fmt.Sprintf("Network device statistic %s.", key),
-			[]string{"device"},
+			[]string{"device", "virt"},
 			nil,
 		)
 	}
@@ -120,7 +120,7 @@ func (c *netDevCollector) Update(ch chan<- prometheus.Metric) error {
 		}
 		for key, value := range devStats {
 			desc := c.metricDesc(key)
-			ch <- prometheus.MustNewConstMetric(desc, prometheus.CounterValue, float64(value), dev)
+			ch <- prometheus.MustNewConstMetric(desc, prometheus.CounterValue, float64(value), dev, *instanceUUID)
 		}
 	}
 	if *netdevAddressInfo {
@@ -135,7 +135,7 @@ func (c *netDevCollector) Update(ch chan<- prometheus.Metric) error {
 
 		for _, addr := range getAddrsInfo(interfaces) {
 			ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, 1,
-				addr.device, addr.addr, addr.netmask, addr.scope)
+				addr.device, addr.addr, addr.netmask, addr.scope, *instanceUUID)
 		}
 	}
 	return nil

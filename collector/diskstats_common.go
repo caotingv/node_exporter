@@ -31,7 +31,7 @@ const (
 )
 
 var (
-	diskLabelNames = []string{"device"}
+	diskLabelNames = []string{"device", "virt"}
 
 	diskstatsDeviceExcludeSet bool
 	diskstatsDeviceExclude    = kingpin.Flag(
